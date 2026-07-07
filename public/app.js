@@ -47,7 +47,7 @@ form.addEventListener("submit", async (event) => {
       throw new Error(data.error || "Não foi possível carregar esse link.");
     }
 
-    video.src = data.videoUrl;
+    video.src = `/api/download?url=${encodeURIComponent(data.videoUrl)}&inline=true`;
     if (data.thumbnail) video.poster = data.thumbnail;
     description.textContent = data.description || "Sem descrição pública encontrada.";
 

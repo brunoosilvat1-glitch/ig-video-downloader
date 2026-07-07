@@ -390,7 +390,7 @@ async function inspectUrl(rawUrl) {
   };
 }
 
-async function proxyDownload(req, res, rawUrl, filename) {
+async function proxyDownload(req, res, rawUrl, filename, inline = false) {
   const url = new URL(rawUrl);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("URL de vídeo inválida.");
@@ -417,19 +417,23 @@ async function proxyDownload(req, res, rawUrl, filename) {
     throw new Error(`Falha ao baixar o vídeo: ${response.status}.`);
   }
 
-  const safeName = (filename || "instagram-video")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9._-]+/gi, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "instagram-video";
-
   const responseHeaders = {
     "content-type": response.headers.get("content-type") || "video/mp4",
-    "content-disposition": `attachment; filename="${safeName}.mp4"`,
     "cache-control": "no-store",
     "accept-ranges": response.headers.get("accept-ranges") || "bytes"
   };
+
+  if (inline) {
+    responseHeaders["content-disposition"] = "inline";
+  } else {
+    const safeName = (filename || "instagram-video")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "instagram-video";
+    responseHeaders["content-disposition"] = `attachment; filename="${safeName}.mp4"`;
+  }
 
   const contentLength = response.headers.get("content-length");
   const contentRange = response.headers.get("content-range");
@@ -481,8 +485,9 @@ createServer(async (req, res) => {
     if (requestUrl.pathname === "/api/download") {
       const target = requestUrl.searchParams.get("url") || "";
       const filename = requestUrl.searchParams.get("filename") || "";
+      const inline = requestUrl.searchParams.get("inline") === "true";
       if (!target) return sendJson(res, 400, { error: "URL de vídeo ausente." });
-      return await proxyDownload(req, res, target, filename);
+      return await proxyDownload(req, res, target, filename, inline);
     }
 
     await serveStatic(req, res, decodeURIComponent(requestUrl.pathname));
