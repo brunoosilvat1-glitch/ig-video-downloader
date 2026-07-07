@@ -301,6 +301,7 @@ video {
   overflow: auto;
   color: #dce3ed;
   line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .download {

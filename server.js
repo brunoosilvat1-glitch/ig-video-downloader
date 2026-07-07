@@ -36,19 +36,32 @@ function sendJson(res, status, payload) {
 }
 
 function cleanText(value = "") {
-  return decodeHtml(value)
-    .replace(/\s+/g, " ")
+  let decoded = decodeHtml(value);
+  try {
+    decoded = decoded
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'")
+      .replace(/\\\\/g, "\\");
+  } catch {
+    // Ignore
+  }
+  return decoded
     .replace(/^Instagram: /i, "")
     .trim();
 }
 
 function decodeHtml(value = "") {
   return value
+    .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, "\"")
-    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(Number(dec)))
+    .replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
 function getMeta(html, property) {
@@ -201,13 +214,13 @@ function isInstagramErrorPage(html) {
 
 function findVideoUrl(html) {
   const candidates = [];
-  const addUrl = (url, score = 0) => {
+  const addUrl = (url, score = 0, hasAudio = true) => {
     const cleaned = cleanMediaUrl(url);
     if (/^https?:\/\//i.test(cleaned) && /\.(mp4|m3u8)(\?|$)/i.test(cleaned)) {
       candidates.push({
         url: cleaned,
         score: score || getUrlScore(cleaned),
-        hasAudio: hasAudioHint(cleaned)
+        hasAudio: hasAudio || hasAudioHint(cleaned)
       });
     }
   };
@@ -216,22 +229,22 @@ function findVideoUrl(html) {
     getMeta(html, "og:video"),
     getMeta(html, "og:video:url"),
     getMeta(html, "og:video:secure_url")
-  ].filter(Boolean).forEach((url) => addUrl(url));
+  ].filter(Boolean).forEach((url) => addUrl(url, 0, true));
 
   const jsonLd = getJsonLd(html);
-  if (jsonLd.contentUrl) addUrl(jsonLd.contentUrl);
-  if (jsonLd.video?.contentUrl) addUrl(jsonLd.video.contentUrl);
+  if (jsonLd.contentUrl) addUrl(jsonLd.contentUrl, 0, true);
+  if (jsonLd.video?.contentUrl) addUrl(jsonLd.video.contentUrl, 0, true);
 
   const directMatch = html.match(/"video_url"\s*:\s*"([^"]+)"/);
   if (directMatch) {
-    addUrl(directMatch[1]);
+    addUrl(directMatch[1], 0, true);
   }
 
-  findEscapedVideoUrls(html).forEach((url) => addUrl(url));
+  findEscapedVideoUrls(html).forEach((url) => addUrl(url, 0, true));
 
   for (const scriptJson of getJsonScripts(html)) {
     const found = deepFindMedia(scriptJson);
-    found.videos.forEach((url) => addUrl(url));
+    found.videos.forEach((url) => addUrl(url, 0, true));
     found.dashManifests.flatMap(findDashVideoCandidates).forEach((candidate) => candidates.push(candidate));
   }
 
@@ -246,18 +259,20 @@ function findVideoUrl(html) {
 }
 
 function findDescription(html) {
-  const jsonLd = getJsonLd(html);
-  const descriptions = [
-    getMeta(html, "og:description"),
-    jsonLd.caption,
-    jsonLd.description
-  ].filter(Boolean);
-
+  const jsonCaptions = [];
   for (const scriptJson of getJsonScripts(html)) {
-    descriptions.push(...deepFindMedia(scriptJson).descriptions);
+    jsonCaptions.push(...deepFindMedia(scriptJson).descriptions);
   }
 
-  return cleanText(descriptions.find(Boolean) || "");
+  const jsonLd = getJsonLd(html);
+  const candidates = [
+    ...jsonCaptions,
+    jsonLd.caption,
+    jsonLd.description,
+    getMeta(html, "og:description")
+  ].filter(Boolean);
+
+  return cleanText(candidates.find(Boolean) || "");
 }
 
 function findThumbnail(html) {
@@ -291,6 +306,21 @@ function normalizeInstagramUrl(value) {
   return url;
 }
 
+function getEmbedUrl(instagramUrl) {
+  try {
+    const url = new URL(instagramUrl);
+    url.search = ""; // Limpa parâmetros
+    let pathname = url.pathname.replace(/\/embed\/?$/i, "");
+    if (!pathname.endsWith("/")) {
+      pathname += "/";
+    }
+    url.pathname = pathname + "embed/";
+    return url.toString();
+  } catch {
+    return instagramUrl;
+  }
+}
+
 async function inspectUrl(rawUrl) {
   const url = normalizeInstagramUrl(rawUrl);
 
@@ -305,14 +335,40 @@ async function inspectUrl(rawUrl) {
     };
   }
 
-  const response = await fetch(url, { headers: instagramHeaders, redirect: "follow" });
-  const html = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`O Instagram respondeu com erro ${response.status}.`);
+  let html = "";
+  let response;
+  try {
+    response = await fetch(url, { headers: instagramHeaders, redirect: "follow" });
+    if (response.ok) {
+      html = await response.text();
+    }
+  } catch (err) {
+    // Silenciar erros de conexão para tentar o fallback
   }
 
-  const videoUrl = findVideoUrl(html);
+  let videoUrl = "";
+  if (html) {
+    videoUrl = findVideoUrl(html);
+  }
+
+  // Fallback para o link de EMBED do Instagram se o link principal for bloqueado ou falhar
+  if (!videoUrl || isInstagramErrorPage(html) || !response || !response.ok) {
+    try {
+      const embedUrl = getEmbedUrl(url.toString());
+      const embedResponse = await fetch(embedUrl, { headers: instagramHeaders, redirect: "follow" });
+      if (embedResponse.ok) {
+        const embedHtml = await embedResponse.text();
+        const embedVideoUrl = findVideoUrl(embedHtml);
+        if (embedVideoUrl) {
+          videoUrl = embedVideoUrl;
+          html = embedHtml; // Usar HTML do embed para extrair miniatura e legenda
+        }
+      }
+    } catch (e) {
+      console.error("Erro no fallback do Embed:", e.message);
+    }
+  }
+
   const description = findDescription(html);
   const title = cleanText(getMeta(html, "og:title") || "video-instagram");
   const thumbnail = findThumbnail(html);
