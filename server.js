@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { URL } from "node:url";
+import { Readable } from "node:stream";
 
 const PORT = Number(process.env.PORT || 5176);
 const PUBLIC_DIR = resolve("public");
@@ -391,64 +392,86 @@ async function inspectUrl(rawUrl) {
 }
 
 async function proxyDownload(req, res, rawUrl, filename, inline = false) {
-  const url = new URL(rawUrl);
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("URL de vídeo inválida.");
-  }
+  const abortController = new AbortController();
 
-  const outgoingHeaders = {
-    "accept": "video/webm,video/ogg,video/*;q=0.9,*/*;q=0.8",
-    "accept-language": "pt-BR,pt;q=0.9,en;q=0.8",
-    "referer": "https://www.instagram.com/",
-    "sec-fetch-dest": "video",
-    "sec-fetch-mode": "no-cors",
-    "sec-fetch-site": "cross-site",
-    "user-agent": instagramHeaders["user-agent"]
-  };
-
-  outgoingHeaders.range = req.headers.range || "bytes=0-";
-
-  const response = await fetch(url, {
-    headers: outgoingHeaders,
-    redirect: "follow"
+  req.on("close", () => {
+    abortController.abort();
   });
 
-  if (!response.ok || !response.body) {
-    throw new Error(`Falha ao baixar o vídeo: ${response.status}.`);
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error("URL de vídeo inválida.");
+    }
+
+    const outgoingHeaders = {
+      "accept": "video/webm,video/ogg,video/*;q=0.9,*/*;q=0.8",
+      "accept-language": "pt-BR,pt;q=0.9,en;q=0.8",
+      "referer": "https://www.instagram.com/",
+      "sec-fetch-dest": "video",
+      "sec-fetch-mode": "no-cors",
+      "sec-fetch-site": "cross-site",
+      "user-agent": instagramHeaders["user-agent"]
+    };
+
+    if (req.headers.range) {
+      outgoingHeaders.range = req.headers.range;
+    }
+
+    const response = await fetch(url, {
+      headers: outgoingHeaders,
+      redirect: "follow",
+      signal: abortController.signal
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Falha ao baixar o vídeo: ${response.status}.`);
+    }
+
+    const responseHeaders = {
+      "content-type": "video/mp4",
+      "cache-control": "no-store",
+      "accept-ranges": "bytes",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET, HEAD, OPTIONS"
+    };
+
+    if (inline) {
+      responseHeaders["content-disposition"] = "inline";
+    } else {
+      const safeName = (filename || "instagram-video")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9._-]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "instagram-video";
+      responseHeaders["content-disposition"] = `attachment; filename="${safeName}.mp4"`;
+    }
+
+    const contentLength = response.headers.get("content-length");
+    const contentRange = response.headers.get("content-range");
+    if (contentLength) responseHeaders["content-length"] = contentLength;
+    if (contentRange) responseHeaders["content-range"] = contentRange;
+
+    res.writeHead(response.status, responseHeaders);
+
+    const nodeStream = Readable.fromWeb(response.body);
+    nodeStream.pipe(res);
+
+    nodeStream.on("error", (err) => {
+      console.error("Erro na stream do proxy:", err.message);
+      abortController.abort();
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      return;
+    }
+    console.error("Erro no proxy:", err.message);
+    if (!res.headersSent) {
+      sendJson(res, 500, { error: err.message });
+    }
   }
-
-  const responseHeaders = {
-    "content-type": "video/mp4",
-    "cache-control": "no-store",
-    "accept-ranges": response.headers.get("accept-ranges") || "bytes",
-    "access-control-allow-origin": "*",
-    "access-control-allow-headers": "*",
-    "access-control-allow-methods": "GET, HEAD, OPTIONS"
-  };
-
-  if (inline) {
-    responseHeaders["content-disposition"] = "inline";
-  } else {
-    const safeName = (filename || "instagram-video")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9._-]+/gi, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "instagram-video";
-    responseHeaders["content-disposition"] = `attachment; filename="${safeName}.mp4"`;
-  }
-
-  const contentLength = response.headers.get("content-length");
-  const contentRange = response.headers.get("content-range");
-  if (contentLength) responseHeaders["content-length"] = contentLength;
-  if (contentRange) responseHeaders["content-range"] = contentRange;
-
-  res.writeHead(response.status, responseHeaders);
-
-  for await (const chunk of response.body) {
-    res.write(chunk);
-  }
-  res.end();
 }
 
 async function serveStatic(req, res, pathname) {
