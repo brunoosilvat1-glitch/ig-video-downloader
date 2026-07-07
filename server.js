@@ -110,7 +110,7 @@ function deepFindMedia(value, found = { videos: [], descriptions: [], thumbnails
   for (const [key, item] of Object.entries(value)) {
     if (typeof item === "string") {
       const normalized = cleanMediaUrl(item);
-      if (/^(https?:)?\/\//i.test(normalized) && /\.(mp4|m3u8)(\?|$)/i.test(normalized)) {
+      if (/^(https?:)?\/\//i.test(normalized) && /\.mp4(\?|$)/i.test(normalized)) {
         found.videos.push(normalized.startsWith("//") ? `https:${normalized}` : normalized);
       }
       if (/manifest|dash/i.test(key) && /BaseURL|Representation|SegmentBase|u003CBaseURL/i.test(item)) {
@@ -205,7 +205,7 @@ function findDashVideoCandidates(value) {
 function findEscapedVideoUrls(html) {
   return [...html.matchAll(/https?:\\\/\\\/[^"']+/g)]
     .map((match) => cleanMediaUrl(match[0]))
-    .filter((candidate) => /\.(mp4|m3u8)(\?|$)/i.test(candidate));
+    .filter((candidate) => /\.mp4(\?|$)/i.test(candidate));
 }
 
 function isInstagramErrorPage(html) {
@@ -216,7 +216,7 @@ function findVideoUrl(html) {
   const candidates = [];
   const addUrl = (url, score = 0, hasAudio = true) => {
     const cleaned = cleanMediaUrl(url);
-    if (/^https?:\/\//i.test(cleaned) && /\.(mp4|m3u8)(\?|$)/i.test(cleaned)) {
+    if (/^https?:\/\//i.test(cleaned) && /\.mp4(\?|$)/i.test(cleaned)) {
       candidates.push({
         url: cleaned,
         score: score || getUrlScore(cleaned),
