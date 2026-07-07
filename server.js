@@ -13,8 +13,31 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
-  ".ico": "image/x-icon"
+  ".ico": "image/x-icon",
+  ".png": "image/png",
+  ".webp": "image/webp"
 };
+
+// Sessão do Instagram armazenada em memória
+// Será populada via endpoint /api/session
+let igSession = {
+  sessionid: process.env.IG_SESSION_ID || "",
+  csrftoken: process.env.IG_CSRF_TOKEN || "",
+  ds_user_id: process.env.IG_DS_USER_ID || ""
+};
+
+function buildCookieHeader(extra = "") {
+  const parts = [];
+  if (igSession.sessionid) parts.push(`sessionid=${igSession.sessionid}`);
+  if (igSession.csrftoken) parts.push(`csrftoken=${igSession.csrftoken}`);
+  if (igSession.ds_user_id) parts.push(`ds_user_id=${igSession.ds_user_id}`);
+  if (extra) parts.push(extra);
+  return parts.join("; ");
+}
+
+function hasSession() {
+  return igSession.sessionid.length > 0;
+}
 
 const instagramHeaders = {
   "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -336,10 +359,20 @@ async function inspectUrl(rawUrl) {
     };
   }
 
+  // Montar headers com cookie de sessão se disponível
+  const headersWithSession = { ...instagramHeaders };
+  const cookieHeader = buildCookieHeader();
+  if (cookieHeader) {
+    headersWithSession["cookie"] = cookieHeader;
+    headersWithSession["x-csrftoken"] = igSession.csrftoken || "";
+    headersWithSession["x-ig-app-id"] = "936619743392459";
+    headersWithSession["sec-fetch-site"] = "same-origin";
+  }
+
   let html = "";
   let response;
   try {
-    response = await fetch(url, { headers: instagramHeaders, redirect: "follow" });
+    response = await fetch(url, { headers: headersWithSession, redirect: "follow" });
     if (response.ok) {
       html = await response.text();
     }
@@ -352,17 +385,64 @@ async function inspectUrl(rawUrl) {
     videoUrl = findVideoUrl(html);
   }
 
+  // Fallback via GraphQL quando há sessão ativa (funciona sem bloqueio com sessionid)
+  if (!videoUrl && hasSession()) {
+    try {
+      const shortcodeMatch = url.pathname.match(/\/(p|reel|tv|reels)\/([A-Za-z0-9_-]+)/);
+      if (shortcodeMatch) {
+        const shortcode = shortcodeMatch[2];
+        const gqlHeaders = {
+          "accept": "*/*",
+          "content-type": "application/x-www-form-urlencoded",
+          "cookie": cookieHeader,
+          "x-csrftoken": igSession.csrftoken,
+          "x-ig-app-id": "936619743392459",
+          "x-requested-with": "XMLHttpRequest",
+          "referer": "https://www.instagram.com/",
+          "user-agent": instagramHeaders["user-agent"]
+        };
+        const gqlBody = new URLSearchParams({
+          variables: JSON.stringify({ shortcode }),
+          doc_id: "9510064595728286"
+        }).toString();
+        const gqlRes = await fetch("https://www.instagram.com/graphql/query", {
+          method: "POST",
+          headers: gqlHeaders,
+          body: gqlBody
+        });
+        const gqlData = await gqlRes.json();
+        const media = gqlData?.data?.xdt_shortcode_media;
+        if (media?.video_url) {
+          videoUrl = cleanMediaUrl(media.video_url);
+          const captionEdge = media?.edge_media_to_caption?.edges?.[0]?.node?.text || "";
+          const gqlDescription = cleanText(captionEdge);
+          const gqlThumbnail = media?.display_url || "";
+          return {
+            sourceUrl: url.toString(),
+            videoUrl,
+            description: gqlDescription,
+            title: cleanText(getMeta(html, "og:title") || "video-instagram"),
+            thumbnail: gqlThumbnail,
+            note: "Vídeo obtido com sucesso via sessão autenticada."
+          };
+        }
+      }
+    } catch (e) {
+      console.error("Erro no fallback GraphQL:", e.message);
+    }
+  }
+
   // Fallback para o link de EMBED do Instagram se o link principal for bloqueado ou falhar
   if (!videoUrl || isInstagramErrorPage(html) || !response || !response.ok) {
     try {
       const embedUrl = getEmbedUrl(url.toString());
-      const embedResponse = await fetch(embedUrl, { headers: instagramHeaders, redirect: "follow" });
+      const embedResponse = await fetch(embedUrl, { headers: headersWithSession, redirect: "follow" });
       if (embedResponse.ok) {
         const embedHtml = await embedResponse.text();
         const embedVideoUrl = findVideoUrl(embedHtml);
         if (embedVideoUrl) {
           videoUrl = embedVideoUrl;
-          html = embedHtml; // Usar HTML do embed para extrair miniatura e legenda
+          html = embedHtml;
         }
       }
     } catch (e) {
@@ -378,6 +458,9 @@ async function inspectUrl(rawUrl) {
     if (isInstagramErrorPage(html)) {
       throw new Error("O Instagram devolveu uma pagina de erro para esse link. Confira se o Reel ainda existe, se o link esta completo e se ele abre sem login em uma janela anonima.");
     }
+    if (!hasSession()) {
+      throw new Error("Configure sua sessão do Instagram nas Configurações do app para desbloquear o download.");
+    }
     throw new Error("Nao encontrei uma URL publica de video nesta pagina. O post pode exigir login, ser privado, ser carrossel, story, ou o Instagram pode ter ocultado o arquivo.");
   }
 
@@ -387,7 +470,7 @@ async function inspectUrl(rawUrl) {
     description,
     title,
     thumbnail,
-    note: "Baixa a melhor versão com áudio embutido exposta pela página pública."
+    note: "Vídeo obtido com sucesso."
   };
 }
 
@@ -510,6 +593,35 @@ createServer(async (req, res) => {
     }
 
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host}`);
+
+    // Endpoint para salvar cookies de sessão do Instagram
+    if (requestUrl.pathname === "/api/session" && req.method === "POST") {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const body = Buffer.concat(chunks).toString("utf-8");
+      try {
+        const payload = JSON.parse(body);
+        if (payload.sessionid) {
+          igSession.sessionid = payload.sessionid.trim();
+          igSession.csrftoken = (payload.csrftoken || "").trim();
+          igSession.ds_user_id = (payload.ds_user_id || "").trim();
+          console.log("[Config] Sessão do Instagram atualizada.");
+          return sendJson(res, 200, { ok: true, message: "Sessão salva! Pode baixar os vídeos agora." });
+        } else {
+          return sendJson(res, 400, { error: "Campo sessionid é obrigatório." });
+        }
+      } catch {
+        return sendJson(res, 400, { error: "JSON inválido." });
+      }
+    }
+
+    // Endpoint para verificar se há sessão configurada
+    if (requestUrl.pathname === "/api/session" && req.method === "GET") {
+      return sendJson(res, 200, {
+        configured: hasSession(),
+        ds_user_id: igSession.ds_user_id || ""
+      });
+    }
 
     if (requestUrl.pathname === "/api/inspect") {
       const target = requestUrl.searchParams.get("url") || "";

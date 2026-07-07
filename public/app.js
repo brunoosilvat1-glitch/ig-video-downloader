@@ -7,7 +7,14 @@ const video = document.querySelector("#video");
 const description = document.querySelector("#description");
 const downloadButton = document.querySelector("#downloadButton");
 const loadButton = document.querySelector("#loadButton");
+const settingsBtn = document.querySelector("#settingsBtn");
+const sessionModal = document.querySelector("#sessionModal");
+const sessionForm = document.querySelector("#sessionForm");
+const modalCloseBtn = document.querySelector("#modalClose");
+const sessionStatusDot = document.querySelector("#sessionStatusDot");
+const sessionStatusText = document.querySelector("#sessionStatusText");
 
+// ──── Status ────────────────────────────────────────────────────────────────
 function setStatus(message, type = "info") {
   statusBox.textContent = message;
   statusBox.classList.toggle("error", type === "error");
@@ -27,38 +34,82 @@ function setDownloadEnabled(enabled) {
   downloadButton.setAttribute("aria-disabled", String(!enabled));
 }
 
-function getShortcode(url) {
-  const match = url.match(/\/(p|reel|tv|reels)\/([A-Za-z0-9_-]+)/);
-  return match ? match[2] : null;
+// ──── Verificar sessão ───────────────────────────────────────────────────────
+async function checkSessionStatus() {
+  try {
+    const res = await fetch("/api/session");
+    const data = await res.json();
+    if (data.configured) {
+      sessionStatusDot.classList.add("active");
+      sessionStatusDot.classList.remove("inactive");
+      sessionStatusText.textContent = "Sessão ativa";
+    } else {
+      sessionStatusDot.classList.remove("active");
+      sessionStatusDot.classList.add("inactive");
+      sessionStatusText.textContent = "Sem sessão";
+    }
+    return data.configured;
+  } catch {
+    return false;
+  }
 }
 
-function decodeHtml(value = "") {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+// ──── Modal de sessão ────────────────────────────────────────────────────────
+function openModal() {
+  sessionModal.classList.add("open");
+  document.body.style.overflow = "hidden";
 }
 
-// Extrai URL do vídeo do HTML da página de embed do Instagram
-// O HTML é carregado pelo celular do próprio usuário (com IP residencial e sem bloqueio)
-async function extractFromEmbed(postUrl) {
-  const shortcode = getShortcode(postUrl);
-  if (!shortcode) throw new Error("Link do Instagram inválido. Verifique se o link é de um Reel ou post público.");
-
-  // Usar o nosso servidor como proxy para evitar CORS ao fazer o fetch do HTML
-  const response = await fetch(`/api/inspect?url=${encodeURIComponent(postUrl)}`);
-  const data = await response.json();
-
-  if (data.error) throw new Error(data.error);
-  if (!data.videoUrl) throw new Error("Não foi possível encontrar o vídeo neste link.");
-
-  return data;
+function closeModal() {
+  sessionModal.classList.remove("open");
+  document.body.style.overflow = "";
 }
 
+settingsBtn.addEventListener("click", openModal);
+modalCloseBtn.addEventListener("click", closeModal);
+sessionModal.addEventListener("click", (e) => {
+  if (e.target === sessionModal) closeModal();
+});
+
+sessionForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const sessionid = document.querySelector("#sessionid").value.trim();
+  const csrftoken = document.querySelector("#csrftoken").value.trim();
+  const ds_user_id = document.querySelector("#ds_user_id").value.trim();
+
+  if (!sessionid) {
+    document.querySelector("#sessionError").textContent = "O campo sessionid é obrigatório.";
+    return;
+  }
+  document.querySelector("#sessionError").textContent = "";
+
+  const saveBtn = document.querySelector("#saveSessionBtn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Salvando...";
+
+  try {
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionid, csrftoken, ds_user_id })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await checkSessionStatus();
+      closeModal();
+      setStatus("✅ Sessão do Instagram configurada! Agora você pode baixar qualquer vídeo.");
+    } else {
+      document.querySelector("#sessionError").textContent = data.error || "Erro ao salvar.";
+    }
+  } catch {
+    document.querySelector("#sessionError").textContent = "Erro de conexão com o servidor.";
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Salvar sessão";
+  }
+});
+
+// ──── Form principal ─────────────────────────────────────────────────────────
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -72,36 +123,41 @@ form.addEventListener("submit", async (event) => {
   setStatus("Carregando vídeo e descrição...");
 
   try {
-    const data = await extractFromEmbed(postUrl);
+    const response = await fetch(`/api/inspect?url=${encodeURIComponent(postUrl)}`);
+    const data = await response.json();
 
-    // Tentar mostrar o video direto (funciona no desktop e alguns celulares)
+    if (!response.ok || data.error) {
+      // Se o erro for por falta de sessão, abrir o modal
+      if (data.error && data.error.includes("sessão")) {
+        openModal();
+      }
+      throw new Error(data.error || "Não foi possível carregar esse link.");
+    }
+
+    // Tentar URL direta primeiro (funciona bem no desktop)
     video.src = data.videoUrl;
     if (data.thumbnail) video.poster = data.thumbnail;
     description.textContent = data.description || "Sem descrição pública encontrada.";
 
     const fileName = makeFilename(data.title || data.description);
-
-    // Botão de download usa proxy do servidor para forçar download correto
     downloadButton.href = `/api/download?url=${encodeURIComponent(data.videoUrl)}&filename=${encodeURIComponent(fileName)}`;
     downloadButton.removeAttribute("target");
     downloadButton.setAttribute("download", `${fileName}.mp4`);
 
-    // Se o vídeo não carregar em 5 segundos, tentar via proxy
-    const videoLoadTimeout = setTimeout(() => {
-      if (video.readyState < 2) {
-        // Mudar para proxy como fallback
+    // Fallback automático para proxy se o vídeo não carregar em 4 segundos
+    let fallbackTriggered = false;
+    const fallbackTimeout = setTimeout(() => {
+      if (video.readyState < 2 && !fallbackTriggered) {
+        fallbackTriggered = true;
         video.src = `/api/download?url=${encodeURIComponent(data.videoUrl)}&inline=true`;
       }
-    }, 5000);
+    }, 4000);
 
-    video.addEventListener("loadeddata", () => {
-      clearTimeout(videoLoadTimeout);
-    }, { once: true });
-
+    video.addEventListener("loadeddata", () => clearTimeout(fallbackTimeout), { once: true });
     video.addEventListener("error", () => {
-      clearTimeout(videoLoadTimeout);
-      // Tentar proxy como fallback quando o link direto falha
-      if (!video.src.includes("/api/download")) {
+      clearTimeout(fallbackTimeout);
+      if (!fallbackTriggered) {
+        fallbackTriggered = true;
         video.src = `/api/download?url=${encodeURIComponent(data.videoUrl)}&inline=true`;
       }
     }, { once: true });
@@ -117,6 +173,9 @@ form.addEventListener("submit", async (event) => {
     loadButton.disabled = false;
   }
 });
+
+// ──── Init ───────────────────────────────────────────────────────────────────
+checkSessionStatus();
 
 // Registra o Service Worker para PWA
 if ("serviceWorker" in navigator) {

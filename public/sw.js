@@ -1,4 +1,4 @@
-const CACHE_NAME = "ig-downloader-v7";
+const CACHE_NAME = "ig-downloader-v8";
 const ASSETS = [
   "/",
   "/index.html",

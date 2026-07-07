@@ -362,3 +362,301 @@ video {
     border-radius: 26px;
   }
 }
+
+/* ─── Session bar ───────────────────────────────────────────────────── */
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.session-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+}
+
+.session-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.session-dot.active {
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.session-dot.inactive {
+  background: var(--muted);
+}
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.settings-btn:hover {
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.4);
+  color: var(--teal);
+}
+
+/* ─── Modal overlay ─────────────────────────────────────────────────── */
+.session-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.session-modal.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal-card {
+  background: var(--panel);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: translateY(20px);
+  transition: transform 0.3s;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(45,212,191,0.08);
+}
+
+.session-modal.open .modal-card {
+  transform: translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-title-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-icon {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.modal-close:hover {
+  color: var(--coral);
+  background: rgba(251, 113, 133, 0.1);
+}
+
+.modal-body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-callout {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(45, 212, 191, 0.07);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.info-callout svg {
+  color: var(--teal);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.info-callout strong {
+  color: var(--ink);
+}
+
+.steps-guide {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.steps-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 10px 0;
+}
+
+.steps-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.steps-list li {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.steps-list a {
+  color: var(--teal);
+  text-decoration: none;
+}
+
+.steps-list kbd {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--ink);
+}
+
+/* ─── Session form ──────────────────────────────────────────────────── */
+#sessionForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.required {
+  color: var(--coral);
+}
+
+.optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+.field-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink);
+  font-family: monospace;
+  transition: border-color 0.2s, background 0.2s;
+  width: 100%;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: var(--teal);
+  background: rgba(45, 212, 191, 0.05);
+}
+
+.field-input::placeholder {
+  color: rgba(154, 163, 178, 0.5);
+}
+
+.field-error {
+  font-size: 12px;
+  color: var(--coral);
+  margin: 0;
+  min-height: 16px;
+}
+
+.save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--teal);
+  color: #050608;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  margin-top: 4px;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: var(--teal-dark);
+  transform: translateY(-1px);
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

@@ -22,6 +22,21 @@
             <h1>Video do Instagram pronto para salvar.</h1>
           </div>
 
+          <!-- Botão de configurações + indicador de sessão -->
+          <div class="session-bar">
+            <div class="session-indicator" id="sessionIndicator" title="Status da sessão do Instagram">
+              <span class="session-dot inactive" id="sessionStatusDot"></span>
+              <span class="session-label" id="sessionStatusText">Sem sessão</span>
+            </div>
+            <button type="button" class="settings-btn" id="settingsBtn" aria-label="Configurar sessão do Instagram">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <span>Configurar</span>
+            </button>
+          </div>
+
           <form id="videoForm" class="link-form">
             <label for="postUrl">Link do Reel ou post</label>
             <div class="input-row">
@@ -71,6 +86,87 @@
         </section>
       </section>
     </main>
+
+    <!-- Modal de Configuração de Sessão -->
+    <div class="session-modal" id="sessionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-area">
+            <svg class="modal-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <h2 id="modalTitle">Configurar Sessão do Instagram</h2>
+          </div>
+          <button type="button" class="modal-close" id="modalClose" aria-label="Fechar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="info-callout">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p>Sua senha <strong>não é necessária</strong>. Apenas o cookie de sessão que já existe no seu navegador quando você está logado no Instagram. Ele <strong>não é armazenado de forma permanente</strong> e reseta ao reiniciar o servidor.</p>
+          </div>
+
+          <div class="steps-guide">
+            <p class="steps-title">📋 Como obter seu <code>sessionid</code>:</p>
+            <ol class="steps-list">
+              <li>Abra o Instagram (<a href="https://www.instagram.com" target="_blank" rel="noopener">instagram.com</a>) e faça login.</li>
+              <li>Pressione <kbd>F12</kbd> para abrir o DevTools.</li>
+              <li>Vá em <strong>Application</strong> → <strong>Cookies</strong> → <code>https://www.instagram.com</code>.</li>
+              <li>Encontre o cookie <strong>sessionid</strong> e copie o valor.</li>
+              <li>Opcionalmente copie também <strong>csrftoken</strong> e <strong>ds_user_id</strong>.</li>
+            </ol>
+          </div>
+
+          <form id="sessionForm" autocomplete="off">
+            <div class="field-group">
+              <label for="sessionid" class="field-label">sessionid <span class="required">*</span></label>
+              <input
+                type="text"
+                id="sessionid"
+                name="sessionid"
+                class="field-input"
+                placeholder="Cole aqui o valor do cookie sessionid"
+                spellcheck="false"
+                autocomplete="off"
+              >
+            </div>
+            <div class="field-group">
+              <label for="csrftoken" class="field-label">csrftoken <span class="optional">(opcional)</span></label>
+              <input
+                type="text"
+                id="csrftoken"
+                name="csrftoken"
+                class="field-input"
+                placeholder="Cole aqui o valor do cookie csrftoken"
+                spellcheck="false"
+                autocomplete="off"
+              >
+            </div>
+            <div class="field-group">
+              <label for="ds_user_id" class="field-label">ds_user_id <span class="optional">(opcional)</span></label>
+              <input
+                type="text"
+                id="ds_user_id"
+                name="ds_user_id"
+                class="field-input"
+                placeholder="Cole aqui o valor do cookie ds_user_id"
+                spellcheck="false"
+                autocomplete="off"
+              >
+            </div>
+            <p class="field-error" id="sessionError"></p>
+            <button type="submit" class="save-btn" id="saveSessionBtn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Salvar sessão
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <script src="/app.js" type="module"></script>
   </body>
