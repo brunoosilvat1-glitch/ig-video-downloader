@@ -52,7 +52,8 @@ form.addEventListener("submit", async (event) => {
     description.textContent = data.description || "Sem descrição pública encontrada.";
 
     const fileName = makeFilename(data.title || data.description);
-    downloadButton.href = `/api/download?url=${encodeURIComponent(data.videoUrl)}&filename=${encodeURIComponent(fileName)}`;
+    downloadButton.href = data.videoUrl;
+    downloadButton.target = "_blank";
     downloadButton.setAttribute("download", `${fileName}.mp4`);
 
     emptyState.classList.add("hidden");
