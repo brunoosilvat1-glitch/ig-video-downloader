@@ -418,9 +418,12 @@ async function proxyDownload(req, res, rawUrl, filename, inline = false) {
   }
 
   const responseHeaders = {
-    "content-type": response.headers.get("content-type") || "video/mp4",
+    "content-type": "video/mp4",
     "cache-control": "no-store",
-    "accept-ranges": response.headers.get("accept-ranges") || "bytes"
+    "accept-ranges": response.headers.get("accept-ranges") || "bytes",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "*",
+    "access-control-allow-methods": "GET, HEAD, OPTIONS"
   };
 
   if (inline) {
@@ -473,6 +476,16 @@ async function serveStatic(req, res, pathname) {
 
 createServer(async (req, res) => {
   try {
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "*",
+        "access-control-allow-methods": "GET, HEAD, OPTIONS"
+      });
+      res.end();
+      return;
+    }
+
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host}`);
 
     if (requestUrl.pathname === "/api/inspect") {

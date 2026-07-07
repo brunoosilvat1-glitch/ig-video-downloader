@@ -1,4 +1,4 @@
-const CACHE_NAME = "ig-downloader-v3";
+const CACHE_NAME = "ig-downloader-v4";
 const ASSETS = [
   "/",
   "/index.html",
@@ -35,8 +35,18 @@ self.addEventListener("activate", (event) => {
 
 // Responder requisições com cache ou buscar na rede
 self.addEventListener("fetch", (event) => {
-  // Ignorar chamadas de API do backend (não devem ser cacheadas)
+  // Ignorar chamadas de API do backend (não devem ser gerenciadas pelo SW)
   if (event.request.url.includes("/api/")) {
+    return;
+  }
+
+  // Ignorar requisições fora do nosso próprio domínio (evita quebrar mídias externas no Safari)
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  // Ignorar requisições com cabeçalho de Range ou de vídeo (evita bugs de reprodução no iOS)
+  if (event.request.headers.has("range") || event.request.url.match(/\.(mp4|m3u8|webm|ogg)($|\?)/i)) {
     return;
   }
 
