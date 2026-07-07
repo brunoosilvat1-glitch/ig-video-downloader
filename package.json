@@ -1,0 +1,10 @@
+{
+  "name": "ig-video-downloader-local",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  }
+}

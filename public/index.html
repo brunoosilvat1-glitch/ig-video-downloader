@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Baixador de Video do Instagram</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <meta name="theme-color" content="#2dd4bf">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="IG Downloader">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="Baixador de video do Instagram">
+        <section class="capture-zone">
+          <div class="hero-copy">
+            <p class="eyebrow">Cole, carregue, baixe</p>
+            <h1>Video do Instagram pronto para salvar.</h1>
+          </div>
+
+          <form id="videoForm" class="link-form">
+            <label for="postUrl">Link do Reel ou post</label>
+            <div class="input-row">
+              <input id="postUrl" name="postUrl" type="url" placeholder="https://www.instagram.com/reel/..." required>
+              <button type="submit" id="loadButton">
+                <span class="button-icon" aria-hidden="true">&darr;</span>
+                <span>Carregar</span>
+              </button>
+            </div>
+          </form>
+
+          <div class="status" id="status" role="status" aria-live="polite"></div>
+        </section>
+
+        <section class="content-grid">
+          <div class="preview-stage">
+            <div class="phone-shell">
+              <div class="phone-speaker" aria-hidden="true"></div>
+
+              <div class="empty-state" id="emptyState">
+                <span class="play-mark" aria-hidden="true"></span>
+                <p>Aguardando video</p>
+              </div>
+
+              <article class="result hidden" id="result">
+                <video id="video" controls playsinline poster=""></video>
+              </article>
+            </div>
+          </div>
+
+          <aside class="side-panel" aria-label="Detalhes do video">
+            <div class="panel-header">
+              <p class="eyebrow">Resultado</p>
+              <h2>Detalhes do video</h2>
+            </div>
+
+            <div class="info-block">
+              <p class="label">Descricao</p>
+              <p id="description" class="description">Carregue um link para ver a descricao publica aqui.</p>
+            </div>
+
+            <a id="downloadButton" class="download disabled" href="#" download aria-disabled="true">
+              <span class="button-icon" aria-hidden="true">&darr;</span>
+              <span>Baixar video</span>
+            </a>
+          </aside>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

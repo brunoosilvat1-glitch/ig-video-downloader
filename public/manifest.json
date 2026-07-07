@@ -1,0 +1,22 @@
+{
+  "name": "Instagram Video Downloader",
+  "short_name": "IG Downloader",
+  "description": "Baixe vídeos e reels do Instagram localmente e de forma rápida.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07080b",
+  "theme_color": "#2dd4bf",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
