@@ -47,12 +47,12 @@ form.addEventListener("submit", async (event) => {
       throw new Error(data.error || "Não foi possível carregar esse link.");
     }
 
-    video.src = `/api/download?url=${encodeURIComponent(data.videoUrl)}&inline=true`;
+    video.src = data.videoUrl;
     if (data.thumbnail) video.poster = data.thumbnail;
     description.textContent = data.description || "Sem descrição pública encontrada.";
 
     const fileName = makeFilename(data.title || data.description);
-    downloadButton.href = `/api/download?url=${encodeURIComponent(data.videoUrl)}&filename=${encodeURIComponent(fileName)}`;
+    downloadButton.href = data.videoUrl;
     downloadButton.target = "_blank";
     downloadButton.setAttribute("download", `${fileName}.mp4`);
 
